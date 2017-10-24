@@ -98,6 +98,11 @@ def get_filename_list(path):
     label_filenames.append(i[1])
   return image_filenames, label_filenames
 
+def get_filename_list_test(path):
+   fd=open(path)
+   image_filenames=fd.read().splitlines()
+   return image_filenames
+
 def CamVidInputs(image_filenames, label_filenames, batch_size):
 
   images = ops.convert_to_tensor(image_filenames, dtype=dtypes.string)
@@ -121,8 +126,13 @@ def CamVidInputs(image_filenames, label_filenames, batch_size):
 def get_all_test_data(im_list, la_list):
   images = []
   labels = []
+  print ("IMAGE LIST **************")
+  print (im_list)
+  print ("LABEL LIST **************")
+  print (la_list)
   index = 0
   for im_filename, la_filename in zip(im_list, la_list):
+    print(im_filename)
     im = np.array(skimage.io.imread(im_filename), np.float32)
     im = im[np.newaxis]
     la = skimage.io.imread(la_filename)
@@ -133,3 +143,18 @@ def get_all_test_data(im_list, la_list):
     labels.append(la)
     #print("**********LABEL*****",labels)
   return images, labels
+
+def get_all_test_data2(im_list):
+  images = []
+  index = 0
+  for im_filename in im_list:
+    im = np.array(skimage.io.imread(im_filename), np.float32)
+    im = im[np.newaxis]
+    #la = skimage.io.imread(la_filename)
+    #print("*********LABEL****",la)
+    #la = la[np.newaxis]
+    #la = la[...,np.newaxis]
+    images.append(im)
+    #labels.append(la)
+    #print("**********LABEL*****",labels)
+  return images

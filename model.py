@@ -13,13 +13,14 @@ from tensorflow.python.ops import gen_nn_ops
 # modules
 from Utils import _variable_with_weight_decay, _variable_on_cpu, _add_loss_summaries, _activation_summary, print_hist_summery, get_hist, per_class_acc, writeImage
 from Inputs import *
+import csv
 
 # Constants describing the training process.
 MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.
 NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 
-INITIAL_LEARNING_RATE = 0.001      # Initial learning rate.
+INITIAL_LEARNING_RATE = 0.0017      # Initial learning rate.
 EVAL_BATCH_SIZE = 5
 BATCH_SIZE = 5
 # for CamVid
@@ -28,8 +29,8 @@ IMAGE_WIDTH = 480
 IMAGE_DEPTH = 3
 
 NUM_CLASSES = 2
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 100
-NUM_EXAMPLES_PER_EPOCH_FOR_TEST = 101
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 1750
+NUM_EXAMPLES_PER_EPOCH_FOR_TEST = 250
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 1
 TEST_ITER = NUM_EXAMPLES_PER_EPOCH_FOR_TEST / BATCH_SIZE
 
@@ -98,10 +99,8 @@ def weighted_loss(logits, labels, num_classes, head=None):
 
 def cal_loss(logits, labels):
     loss_weight = np.array([
-      0.2540,
-      15.7610,
-      
-      ]) # class 0~10
+      0.5103,
+      24.8136]) # class 0~11
 
     labels = tf.cast(labels, tf.int32)
     # return loss(logits, labels)
@@ -146,6 +145,8 @@ def get_deconv_filter(f_shape):
 
 def deconv_layer(inputT, f_shape, output_shape, stride=2, name=None):
   # output_shape = [b, w, h, c]
+  # sess_temp = tf.InteractiveSession()
+  sess_temp = tf.global_variables_initializer()
   strides = [1, stride, stride, 1]
   with tf.variable_scope(name):
     weights = get_deconv_filter(f_shape)
@@ -162,6 +163,7 @@ def batch_norm_layer(inputT, is_training, scope):
 
 
 def inference(images, labels, batch_size, phase_train):
+    print("--------------Inference------------")
     # norm1
     norm1 = tf.nn.lrn(images, depth_radius=5, bias=1.0, alpha=0.0001, beta=0.75,
                 name='norm1')
@@ -188,11 +190,36 @@ def inference(images, labels, batch_size, phase_train):
     # pool4
     pool4, pool4_indices = tf.nn.max_pool_with_argmax(conv4, ksize=[1, 2, 2, 1],
                            strides=[1, 2, 2, 1], padding='SAME', name='pool4')
+
+    # conv3
+    conv5 = conv_layer_with_bn(pool4, [7, 7, 64, 64], phase_train, name="conv5")
+
+    # pool3
+    pool5, pool5_indices = tf.nn.max_pool_with_argmax(conv5, ksize=[1, 2, 2, 1],
+                           strides=[1, 2, 2, 1], padding='SAME', name='pool5')
+    # conv4
+    conv6 = conv_layer_with_bn(pool5, [7, 7, 64, 64], phase_train, name="conv6")
+
+    # pool4
+    pool6, pool6_indices = tf.nn.max_pool_with_argmax(conv6, ksize=[1, 2, 2, 1],
+                           strides=[1, 2, 2, 1], padding='SAME', name='pool6')
+
     """ End of encoder """
     """ start upsample """
     # upsample4
     # Need to change when using different dataset out_w, out_h
     # upsample4 = upsample_with_pool_indices(pool4, pool4_indices, pool4.get_shape(), out_w=45, out_h=60, scale=2, name='upsample4')
+
+    upsample6 = deconv_layer(pool6, [2, 2, 64, 64], [batch_size, 10, 15, 64], 2, "up6")
+    # decode 4
+    conv_decode6 = conv_layer_with_bn(upsample6, [7, 7, 64, 64], phase_train, False, name="conv_decode6")
+
+    # upsample 3
+    # upsample3 = upsample_with_pool_indices(conv_decode4, pool3_indices, conv_decode4.get_shape(), scale=2, name='upsample3')
+    upsample5= deconv_layer(conv_decode6, [2, 2, 64, 64], [batch_size, 20, 30, 64], 2, "up5")
+    # decode 3
+    conv_decode5 = conv_layer_with_bn(upsample5, [7, 7, 64, 64], phase_train, False, name="conv_decode5")
+
     upsample4 = deconv_layer(pool4, [2, 2, 64, 64], [batch_size, 45, 60, 64], 2, "up4")
     # decode 4
     conv_decode4 = conv_layer_with_bn(upsample4, [7, 7, 64, 64], phase_train, False, name="conv_decode4")
@@ -231,76 +258,6 @@ def inference(images, labels, batch_size, phase_train):
 
     return loss, logit
 
-def inference_test(images,batch_size, phase_train):
-    # norm1
-    norm1 = tf.nn.lrn(images, depth_radius=5, bias=1.0, alpha=0.0001, beta=0.75,
-                name='norm1')
-    # conv1
-    conv1 = conv_layer_with_bn(norm1, [7, 7, images.get_shape().as_list()[3], 64], phase_train, name="conv1")
-    # pool1
-    pool1, pool1_indices = tf.nn.max_pool_with_argmax(conv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
-                           padding='SAME', name='pool1')
-    # conv2
-    conv2 = conv_layer_with_bn(pool1, [7, 7, 64, 64], phase_train, name="conv2")
-
-    # pool2
-    pool2, pool2_indices = tf.nn.max_pool_with_argmax(conv2, ksize=[1, 2, 2, 1],
-                           strides=[1, 2, 2, 1], padding='SAME', name='pool2')
-    # conv3
-    conv3 = conv_layer_with_bn(pool2, [7, 7, 64, 64], phase_train, name="conv3")
-
-    # pool3
-    pool3, pool3_indices = tf.nn.max_pool_with_argmax(conv3, ksize=[1, 2, 2, 1],
-                           strides=[1, 2, 2, 1], padding='SAME', name='pool3')
-    # conv4
-    conv4 = conv_layer_with_bn(pool3, [7, 7, 64, 64], phase_train, name="conv4")
-
-    # pool4
-    pool4, pool4_indices = tf.nn.max_pool_with_argmax(conv4, ksize=[1, 2, 2, 1],
-                           strides=[1, 2, 2, 1], padding='SAME', name='pool4')
-    """ End of encoder """
-    """ start upsample """
-    # upsample4
-    # Need to change when using different dataset out_w, out_h
-    # upsample4 = upsample_with_pool_indices(pool4, pool4_indices, pool4.get_shape(), out_w=45, out_h=60, scale=2, name='upsample4')
-    upsample4 = deconv_layer(pool4, [2, 2, 64, 64], [batch_size, 45, 60, 64], 2, "up4")
-    # decode 4
-    conv_decode4 = conv_layer_with_bn(upsample4, [7, 7, 64, 64], phase_train, False, name="conv_decode4")
-
-    # upsample 3
-    # upsample3 = upsample_with_pool_indices(conv_decode4, pool3_indices, conv_decode4.get_shape(), scale=2, name='upsample3')
-    upsample3= deconv_layer(conv_decode4, [2, 2, 64, 64], [batch_size, 90, 120, 64], 2, "up3")
-    # decode 3
-    conv_decode3 = conv_layer_with_bn(upsample3, [7, 7, 64, 64], phase_train, False, name="conv_decode3")
-
-    # upsample2
-    # upsample2 = upsample_with_pool_indices(conv_decode3, pool2_indices, conv_decode3.get_shape(), scale=2, name='upsample2')
-    upsample2= deconv_layer(conv_decode3, [2, 2, 64, 64], [batch_size, 180, 240, 64], 2, "up2")
-    # decode 2
-    conv_decode2 = conv_layer_with_bn(upsample2, [7, 7, 64, 64], phase_train, False, name="conv_decode2")
-
-    # upsample1
-    # upsample1 = upsample_with_pool_indices(conv_decode2, pool1_indices, conv_decode2.get_shape(), scale=2, name='upsample1')
-    upsample1= deconv_layer(conv_decode2, [2, 2, 64, 64], [batch_size, 360, 480, 64], 2, "up1")
-    # decode4
-    conv_decode1 = conv_layer_with_bn(upsample1, [7, 7, 64, 64], phase_train, False, name="conv_decode1")
-    """ end of Decode """
-    """ Start Classify """
-    # output predicted class number (6)
-    with tf.variable_scope('conv_classifier') as scope:
-      kernel = _variable_with_weight_decay('weights',
-                                           shape=[1, 1, 64, NUM_CLASSES],
-                                           initializer=msra_initializer(1, 64),
-                                           wd=0.0005)
-      conv = tf.nn.conv2d(conv_decode1, kernel, [1, 1, 1, 1], padding='SAME')
-      biases = _variable_on_cpu('biases', [NUM_CLASSES], tf.constant_initializer(0.0))
-      conv_classifier = tf.nn.bias_add(conv, biases, name=scope.name)
-
-    logit = conv_classifier
-    #loss = cal_loss(conv_classifier, labels) Not required for testing
-
-    return logit
-
 def train(total_loss, global_step):
     total_sample = 274
     num_batches_per_epoch = 274/1
@@ -334,7 +291,6 @@ def train(total_loss, global_step):
     return train_op
 
 def test(FLAGS):
-  cnt=0
   max_steps = FLAGS.max_steps
   batch_size = FLAGS.batch_size
   train_dir = FLAGS.log_dir # /tmp3/first350/TensorFlow/Logs
@@ -343,25 +299,23 @@ def test(FLAGS):
   image_w = FLAGS.image_w
   image_h = FLAGS.image_h
   image_c = FLAGS.image_c
+  test_img_dir = FLAGS.test_img_dir
   # testing should set BATCH_SIZE = 1
   batch_size = 1
 
-  #image_filenames, label_filenames = get_filename_list(test_dir)
-  image_filenames=get_filename_list_test(test_dir)
+  image_filenames, label_filenames = get_filename_list(test_dir)
+
   test_data_node = tf.placeholder(
         tf.float32,
         shape=[batch_size, image_h, image_w, image_c])
-  print("**************",test_data_node)
 
-  #test_labels_node = tf.placeholder(tf.int64, shape=[batch_size, 360, 480, 1])
-  #print ("*************",test_labels_node)
+  test_labels_node = tf.placeholder(tf.int64, shape=[batch_size, 360, 480, 1])
 
   phase_train = tf.placeholder(tf.bool, name='phase_train')
 
-  logits= inference_test(test_data_node,batch_size, phase_train)
+  loss, logits = inference(test_data_node, test_labels_node, batch_size, phase_train)
 
-  pred = tf.argmax(logits, dimension=3)
-
+  pred = tf.argmax(logits, axis=3)
   # get moving avg
   variable_averages = tf.train.ExponentialMovingAverage(
                       MOVING_AVERAGE_DECAY)
@@ -369,32 +323,52 @@ def test(FLAGS):
 
   saver = tf.train.Saver(variables_to_restore)
 
+  # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.0001)
+
   with tf.Session() as sess:
     # Load checkpoint
     saver.restore(sess, test_ckpt )
 
-    images= get_all_test_data2(image_filenames)
+    images, labels, im_lists = get_all_test_data_with_txt(image_filenames, label_filenames)
 
     threads = tf.train.start_queue_runners(sess=sess)
     hist = np.zeros((NUM_CLASSES, NUM_CLASSES))
-    for image_batch in images:
-
+    print("Save Tested image folder name is {}".format(str("./"+test_img_dir)))
+    os.mkdir(str("./"+test_img_dir))
+    for image_batch, label_batch, im_list  in zip(images, labels, im_lists):
+      img_path = im_list.split('/')[2]
+      output_img_path = os.path.join(str("./"+test_img_dir),img_path)
+      print("----------------------------{}---------------------".format(img_path))
       feed_dict = {
         test_data_node: image_batch,
+        test_labels_node: label_batch,
         phase_train: False
       }
 
       dense_prediction, im = sess.run([logits, pred], feed_dict=feed_dict)
       # output_image to verify
       if (FLAGS.save_image):
-          writeImage(im[0], 'testing_image{}.png'.format(cnt))
-          cnt+=1
+          writeImage(im[0], output_img_path)
+          # writeImage(im[0], 'out_image/'+str(image_filenames[count]).split('/')[-1])
 
       #hist += get_hist(dense_prediction, label_batch)
-    #acc_total = np.diag(hist).sum() / hist.sum()
-    #iu = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
-    #print("acc: ", acc_total)
-    #print("mean IU: ", np.nanmean(iu))
+      #print("---------------------Dense Predictin--------------------")
+      #print(dense_prediction)
+      #print(dense_prediction.shape)
+      hist = get_hist(dense_prediction, label_batch)
+      # count+=1
+      #print("---------------------HIST--------------------")
+      #print(hist)
+      #print(hist.shape)
+      #print("---------------------TEST--------------------")
+      #aktest=label_batch.flatten()
+      #print(aktest[np.where(aktest==1)])
+      #print(im[0])
+      #print("--------------------AKTESTDONE----------------")
+      acc_total = np.diag(hist).sum() / hist.sum()
+      iu = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
+      print("acc: ", acc_total)
+      print("mean IU: ", np.nanmean(iu))
 
 def training(FLAGS, is_finetune=False):
   max_steps = FLAGS.max_steps
@@ -433,17 +407,19 @@ def training(FLAGS, is_finetune=False):
     # Build a Graph that trains the model with one batch of examples and updates the model parameters.
     train_op = train(loss, global_step)
 
-
-    saver = tf.train.Saver(tf.global_variables())
+    #saver = tf.train.Saver(tf.global_variables())
+    saver = tf.train.Saver(tf.global_variables(),max_to_keep=30)
 
     summary_op = tf.summary.merge_all()
 
+    # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.0001)
+    # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
+    # config=tf.ConfigProto(gpu_options=gpu_options)
     with tf.Session() as sess:
       # Build an initialization operation to run below.
       if (is_finetune == True):
           saver.restore(sess, finetune_ckpt )
       else:
-
           init = tf.global_variables_initializer()
           sess.run(init)
 
@@ -452,7 +428,6 @@ def training(FLAGS, is_finetune=False):
       threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
       # Summery placeholders
-
       summary_writer = tf.summary.FileWriter(train_dir, sess.graph)
       average_pl = tf.placeholder(tf.float32)
       acc_pl = tf.placeholder(tf.float32)
@@ -460,7 +435,14 @@ def training(FLAGS, is_finetune=False):
       average_summary = tf.summary.scalar("test_average_loss", average_pl)
       acc_summary = tf.summary.scalar("test_accuracy", acc_pl)
       iu_summary = tf.summary.scalar("Mean_IU", iu_pl)
-
+      log_file=open(train_dir + '/loss_log.csv','a')
+      fieldnames=['steps','trainloss','valloss']
+      writer=csv.DictWriter(log_file,fieldnames=fieldnames)
+      writer.writeheader()
+      log2_file=open(train_dir + '/accuracy_log.csv','a')
+      fieldnames2=['step','training_accuracy','class_0_train_acc','class_1_train_acc','validation_acc','class_0_val_acc','class_1_val_acc']
+      writer2=csv.DictWriter(log2_file,fieldnames=fieldnames2)
+      writer2.writeheader()
       for step in range(startstep, startstep + max_steps):
         image_batch ,label_batch = sess.run([images, labels])
         # since we still use mini-batches in validation, still set bn-layer phase_train = True
@@ -475,7 +457,7 @@ def training(FLAGS, is_finetune=False):
         duration = time.time() - start_time
 
         assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
-
+        csv_training_loss = 0
         if step % 10 == 0:
           num_examples_per_step = batch_size
           examples_per_sec = num_examples_per_step / duration
@@ -488,7 +470,8 @@ def training(FLAGS, is_finetune=False):
 
           # eval current training batch pre-class accuracy
           pred = sess.run(eval_prediction, feed_dict=feed_dict)
-          per_class_acc(pred, label_batch)
+          train_acc,train_class_0,train_class_1 = per_class_acc(pred, label_batch)
+          csv_training_loss = loss_value
 
         if step % 100 == 0:
           print("start validating.....")
@@ -505,12 +488,15 @@ def training(FLAGS, is_finetune=False):
             total_val_loss += _val_loss
             hist += get_hist(_val_pred, val_labels_batch)
           print("val loss: ", total_val_loss / TEST_ITER)
+          print("INFO:  Writing loss csv file")
+          writer.writerow({'steps':step,'trainloss':csv_training_loss,'valloss':(total_val_loss / TEST_ITER)})
+          print("INFO:  Loss csv writing completed")
           acc_total = np.diag(hist).sum() / hist.sum()
           iu = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
           test_summary_str = sess.run(average_summary, feed_dict={average_pl: total_val_loss / TEST_ITER})
           acc_summary_str = sess.run(acc_summary, feed_dict={acc_pl: acc_total})
           iu_summary_str = sess.run(iu_summary, feed_dict={iu_pl: np.nanmean(iu)})
-          print_hist_summery(hist)
+          print_hist_summery(hist,step,train_acc,train_class_0,train_class_1,writer2)
           print(" end validating.... ")
 
           summary_str = sess.run(summary_op, feed_dict=feed_dict)

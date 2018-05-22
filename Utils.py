@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from PIL import Image
-
+np.set_printoptions(threshold=np.nan)
 def _activation_summary(x):
   """Helper to create summaries for activations.
 
@@ -15,7 +15,6 @@ def _activation_summary(x):
   """
   # session. This helps the clarity of presentation on tensorboard.
   tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
-
   tf.summary.histogram(tensor_name + '/activations', x)
   tf.summary.scalar(tensor_name + '/sparsity', tf.nn.zero_fraction(x))
 
@@ -40,7 +39,6 @@ def _add_loss_summaries(total_loss):
   for l in losses + [total_loss]:
     # Name each loss as '(raw)' and name the moving average version of the loss
     # as the original loss name.
-
     tf.summary.scalar(l.op.name +' (raw)', l)
     tf.summary.scalar(l.op.name, loss_averages.average(l))
 
@@ -57,7 +55,7 @@ def _variable_on_cpu(name, shape, initializer):
   Returns:
     Variable Tensor
   """
-  with tf.device('/cpu:0'):
+  with tf.device('/gpu:0'):
     var = tf.get_variable(name, shape, initializer=initializer)
   return var
 
@@ -86,19 +84,15 @@ def _variable_with_weight_decay(name, shape, initializer, wd):
     tf.add_to_collection('losses', weight_decay)
   return var
 
-def writeImage(image, filename):
+def writeImage(image, filename=None):
     """ store label data to colored image """
-    Sky = [128,128,128]
-    Building = [128,0,0]
-    Pole = [192,192,128]
-    Road_marking = [255,69,0]
-    Road = [128,64,128]
-    Pavement = [60,40,222]
+    NoPlastic = [128,128,128]
+    Plastic = [128,0,0]
     r = image.copy()
     g = image.copy()
     b = image.copy()
-    label_colours = np.array([Sky, Building, Pole, Road, Road_marking, Pavement])
-    for l in range(0,6):
+    label_colours = np.array([NoPlastic,Plastic])
+    for l in range(0,2):
         r[image==l] = label_colours[l,0]
         g[image==l] = label_colours[l,1]
         b[image==l] = label_colours[l,2]
@@ -107,7 +101,9 @@ def writeImage(image, filename):
     rgb[:,:,1] = g/1.0
     rgb[:,:,2] = b/1.0
     im = Image.fromarray(np.uint8(rgb))
-    im.save(filename)
+    if filename != None:
+      im.save(filename)
+    return rgb
 
 def storeImageQueue(data, labels, step):
   """ data and labels are all numpy arrays """
@@ -121,6 +117,10 @@ def storeImageQueue(data, labels, step):
 
 def fast_hist(a, b, n):
     k = (a >= 0) & (a < n)
+    #print("----------------------K-----------------------")
+    #print(k)
+    #print(np.bincount(n * a[k].astype(int) + b[k], minlength=n**2))
+    #print(a[np.where(a==1)])
     return np.bincount(n * a[k].astype(int) + b[k], minlength=n**2).reshape(n, n)
 
 def get_hist(predictions, labels):
@@ -131,7 +131,7 @@ def get_hist(predictions, labels):
     hist += fast_hist(labels[i].flatten(), predictions[i].argmax(2).flatten(), num_class)
   return hist
 
-def print_hist_summery(hist):
+def print_hist_summery(hist,step,train_acc,train_class_0,train_class_1,writer2):
   acc_total = np.diag(hist).sum() / hist.sum()
   print ('accuracy = %f'%np.nanmean(acc_total))
   iu = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
@@ -142,6 +142,11 @@ def print_hist_summery(hist):
       else:
         acc = np.diag(hist)[ii] / float(hist.sum(1)[ii])
       print("    class # %d accuracy = %f "%(ii, acc))
+      if ii==0:
+        val_class_0=acc
+      else:
+        val_class_1=acc
+  writer2.writerow({'step':step,'training_accuracy':train_acc,'class_0_train_acc':train_class_0,'class_1_train_acc':train_class_1,'validation_acc':(np.nanmean(acc_total)),'class_0_val_acc':val_class_0,'class_1_val_acc':val_class_1})
 
 def per_class_acc(predictions, label_tensor):
     labels = label_tensor
@@ -159,4 +164,10 @@ def per_class_acc(predictions, label_tensor):
           acc = 0.0
         else:
           acc = np.diag(hist)[ii] / float(hist.sum(1)[ii])
-        print("    class # %d accuracy = %f "%(ii,acc))
+        print("    class Check # %d accuracy = %f "%(ii,acc))
+        if ii==0:
+          train_class_0=acc
+        else:
+          train_class_1=acc
+    train_acc=np.nanmean(acc_total)
+    return (train_acc,train_class_0,train_class_1)

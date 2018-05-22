@@ -1,6 +1,5 @@
 import tensorflow as tf
-import model
-import time
+import model_dropout as model
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -12,13 +11,13 @@ tf.app.flags.DEFINE_string('log_dir', "/tmp3/first350/TensorFlow/Logs", """ dir 
 tf.app.flags.DEFINE_string('image_dir', "/tmp3/first350/SegNet-Tutorial/CamVid/train.txt", """ path to CamVid image """)
 tf.app.flags.DEFINE_string('test_dir', "/tmp3/first350/SegNet-Tutorial/CamVid/test.txt", """ path to CamVid test image """)
 tf.app.flags.DEFINE_string('val_dir', "/tmp3/first350/SegNet-Tutorial/CamVid/val.txt", """ path to CamVid val image """)
-tf.app.flags.DEFINE_integer('max_steps', "1000", """ max_steps """)
-#tf.app.flags.DEFINE_integer('max_steps', "20000", """ max_steps """)
+tf.app.flags.DEFINE_integer('max_steps', "10000", """ max_steps """)
 tf.app.flags.DEFINE_integer('image_h', "360", """ image height """)
 tf.app.flags.DEFINE_integer('image_w', "480", """ image width """)
 tf.app.flags.DEFINE_integer('image_c', "3", """ image channel (RGB) """)
 tf.app.flags.DEFINE_integer('num_class', "2", """ total class number """)
 tf.app.flags.DEFINE_boolean('save_image', True, """ whether to save predicted image """)
+tf.app.flags.DEFINE_string('test_img_dir', "", """ total class number """)
 
 def checkArgs():
     if FLAGS.testing != '':
@@ -51,7 +50,4 @@ def main(args):
         model.training(FLAGS, is_finetune=False)
 
 if __name__ == '__main__':
-  start=time.time()
   tf.app.run()
-  end=time.time()
-  print("TOTAL TIME",end-start)

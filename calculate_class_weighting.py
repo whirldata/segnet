@@ -9,7 +9,7 @@ number of pixels in images where c is present, and median freq is the median of 
 import argparse
 import numpy as np
 import sys
-sys.path.append('/usr/local/lib/python2.7/site-packages')
+#sys.path.append('/usr/local/lib/python2.7/site-packages')
 import cv2
 
 
@@ -28,10 +28,10 @@ if __name__ == '__main__':
     classes, freq, class_weights, present_in_data, a = ([0 for i in xrange(args.num_classes)] for i in xrange(5))
     image_nr = 0
     median_freq = 0
-    print(classes)
+    #print(classes)
     with open(args.source) as inf:
         for line in inf:
-            print(line)
+            #print(line)
             print 'progress: {}'.format(image_nr+1)
             image_nr += 1
             columns = line.split()  # split line into columns
@@ -43,29 +43,30 @@ if __name__ == '__main__':
             #cv2.imshow("hgahg", labels)
             #cv2.waitKey(0)
             for i in xrange(args.num_classes):
-                print("Sum Labels and i")
-                print(np.sum((labels == i)))
-                print("Sum Labels")
-                print(np.sum(labels))
-                print("Labels")
-                print(labels)
-                print("Labels == i")
-                print(labels == i)
-                print("i")
-                print(i)
+#                print("Sum Labels and i")
+#                print(np.sum((labels == i)))
+#                print("Sum Labels")
+#                print(np.sum(labels))
+#                print("Labels")
+#                print(labels)
+#                print("Labels == i")
+#                print(labels == i)
+#                print("i")
+#                print(i)
                 if (np.sum((labels == i))) == 0:    
                     pass
                 else:
                     classes[i] += (labels == i).sum()  # sum up all pixels that belongs to a certain class
                     present_in_data[i] += 1  # how often the class is present in the dataset
-                    print (present_in_data[i] , "****")
+                    #print (present_in_data[i] , "****")
 
         for l in xrange(args.num_classes):
             if present_in_data[l] == 0:
                 raise Exception("The class {} is not present in the dataset".format(l+1))
 
             freq[l] = float(classes[l]) / float(present_in_data[l])  # calculate freq per class
-            median_freq = 0.5*sum(freq)/(len(classes))
+            # median_freq = 0.5*sum(freq)/(len(classes))
+            median_freq=np.median(freq)
 
         for c in xrange(args.num_classes):
             a[c] = float(median_freq) / float(freq[c])

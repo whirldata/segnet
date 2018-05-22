@@ -1,0 +1,6 @@
+./body-test/mani-test.png ./val-annot-body/101.png
+./body-test/mani-test.png ./val-annot-body/101.png
+./body-test/mani-test.png ./val-annot-body/101.png
+./body-test/mani-test.png ./val-annot-body/101.png
+./body-test/mani-test.png ./val-annot-body/101.png
+./body-test/mani-test.png ./val-annot-body/101.png

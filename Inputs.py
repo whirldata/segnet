@@ -6,13 +6,15 @@ import numpy as np
 import math
 import skimage
 import skimage.io
+import cv2
+
 
 IMAGE_HEIGHT = 360
 IMAGE_WIDTH = 480
 IMAGE_DEPTH = 3
 
 NUM_CLASSES = 2
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 100
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 367
 NUM_EXAMPLES_PER_EPOCH_FOR_TEST = 101
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 1
 
@@ -98,11 +100,6 @@ def get_filename_list(path):
     label_filenames.append(i[1])
   return image_filenames, label_filenames
 
-def get_filename_list_test(path):
-   fd=open(path)
-   image_filenames=fd.read().splitlines()
-   return image_filenames
-
 def CamVidInputs(image_filenames, label_filenames, batch_size):
 
   images = ops.convert_to_tensor(image_filenames, dtype=dtypes.string)
@@ -126,35 +123,32 @@ def CamVidInputs(image_filenames, label_filenames, batch_size):
 def get_all_test_data(im_list, la_list):
   images = []
   labels = []
-  print ("IMAGE LIST **************")
-  print (im_list)
-  print ("LABEL LIST **************")
-  print (la_list)
   index = 0
   for im_filename, la_filename in zip(im_list, la_list):
-    print(im_filename)
     im = np.array(skimage.io.imread(im_filename), np.float32)
     im = im[np.newaxis]
-    la = skimage.io.imread(la_filename)
-    #print("*********LABEL****",la)
+    la = skimage.io.imread(la_filename,as_grey=True)
     la = la[np.newaxis]
     la = la[...,np.newaxis]
     images.append(im)
     labels.append(la)
-    #print("**********LABEL*****",labels)
   return images, labels
 
-def get_all_test_data2(im_list):
+
+def get_all_test_data_with_txt(im_list, la_list):
   images = []
+  labels = []
   index = 0
-  for im_filename in im_list:
+  for im_filename, la_filename in zip(im_list, la_list):
     im = np.array(skimage.io.imread(im_filename), np.float32)
     im = im[np.newaxis]
-    #la = skimage.io.imread(la_filename)
-    #print("*********LABEL****",la)
-    #la = la[np.newaxis]
-    #la = la[...,np.newaxis]
+    la = cv2.imread(la_filename)
+    la = cv2.cvtColor(la, cv2.COLOR_BGR2GRAY)
+    #la = skimage.io.imread(la_filename,as_grey=True)
+    la = la[np.newaxis]
+    la = la[...,np.newaxis]
     images.append(im)
-    #labels.append(la)
-    #print("**********LABEL*****",labels)
-  return images
+    labels.append(la)
+  return images, labels, im_list
+
+

@@ -1,63 +1,65 @@
-# Tensorflow-SegNet
-Implement slightly different (see below for detail) [SegNet](http://arxiv.org/abs/1511.00561) in tensorflow,
-successfully trained segnet-basic in CamVid dataset.
+# SegNet using Tensorflow
+This is to implement the conncept of SegNet(https://arxiv.org/pdf/1511.00561.pdf) in TensorFlow and to train the SegNet-Basic architecture's model on a plastic dataset(used to detect plastic on a conveyor belt) and on a T-shirt dataset(for segmenting the shirt a person is wearing).  
 
-Due to indice unravel still unavailable in tensorflow, the original upsampling
-method is temporarily replaced simply by deconv( or conv-transpose) layer (without pooling indices).
-You can follow the issue here: https://github.com/tensorflow/tensorflow/issues/2169
-(The current workaround for unpooling layer is a bit slow because it lacks of GPU support.)
+For SegNet model details, please go to https://github.com/alexgkendall/caffe-segnet
 
-
-for model detail, please go to https://github.com/alexgkendall/caffe-segnet
-
-# Requirement
-tensorflow 1.0
-Pillow (optional, for write label image)
+## Requirements
+tensorflow 1.3  
+Open-CV  
 scikit-image
 
-# Update
+## Usage
+For Training:
 
-Update to tf 1.0
+```
+Syntax:
+python main.py --log_dir=<path_to_your_log> --image_dir=<path_to_Plastic_train.txt> --val_dir=<path_to_Plastic_val.txt> --batch_size=<batch_size_num>
+Example:
+python main.py --log_dir=./plastic_log_ckpt --image_dir=./train.txt --val_dir=./val.txt --batch_size=5
+```
 
-Finally get some time to refactor a bit, removing some un-used function and
-remove the hard-coded file path Now the model should be easy to config.
-The parameters can be found in main.py.
+For Finetune:  
+If due to any reason the training stopped, the training can be continued using the latest checkpoint file.
+```
+Syntax:
+python main.py --finetune=<path_to_saved_ckpt> --log_dir=<path_to_your_log> --image_dir=<path_to_Plastic_train.txt> --val_dir=<path_to_Plastic_val.txt> --batch_size=<batch_size_num>
+Example:
+python main.py --finetune=./plastic_log_ckpt/model.ckpt-14999 --log_dir=./plastic_log_ckpt --image_dir=./train.txt --val_dir=./val.txt --batch_size=5
+```
 
-I planned to add more feature such as dilation, multi-resolution, sequential learning..etc.
-Making it more like a "basic" segmentation toolbox and support more dataset as well.
-Therefore the model and documentation will be changed accordingly in the future.
+For Testing:
 
-More utility function will be added and some messed coding style will be fixed.
-Any feature request is also welcomed.
+```
+Syntax:
+python main.py --log_dir=<path_to_your_log> --testing=<path_to_saved_ckpt> --test_dir=<path_to_Plastic_test.txt> --batch_size=<batch_size_num> --save_image=True --test_img_dir=<path_to_folder_to_store_predicted_results>
+Example:
+python main.py --log_dir=./plastic_log_ckpt --testing=./plastic_log_ckpt/model.ckpt-14999 --test_dir=./test.txt --batch_size=5 --save_image=True --test_img_dir=./PlasticPredict
+```
+### Parameter Definitions
+- log-dir - The folder name in which the checkpoints and TensorBoard logs must be saved.During training, this folder will be created and all the checkpoints,Tensorboard Logs and csv's will be saved while training. 
+- image_dir - This will be the text file containing path to the training images and their corresponding labeled images.
+- val_dir - This will be the text file containing path to the validation images and their corresponding lebeled images.
+- finetune - This will contain the path of the checkpoint file from where you need the training to continue.
+- batch_size - This will specify the number of images to be passed on to the network at every step.
+- testing - This will specify the checkpoint file to be used to test the testing set.
+- test_dir - This will be the text file containing path to the test images and their corresponding labeled images.
+- test_img_dir - Here we mention the folder in which the predicted results will be stored. The folder name is required in this parameter and this would be created while testing.
 
-# Usage
-see also example.sh
-training:
+The default path and parameters can be set in main.py.
 
-  python main.py --log_dir=path_to_your_log --image_dir=path_to_CamVid_train.txt --val_dir=path_to_CamVid_val.txt --batch_size=5
+## Dataset
+The text file used must be in the following format: 
 
-finetune:
 
-  python main.py --finetune=path_to_saved_ckpt --log_dir=path_to_your_log --image_dir=path_to_CamVid_train.txt --val_dir=path_to_CamVid_val.txt --batch_size=5
+"path_to_image1" "path_to_corresponding_label_image1",
 
-testing:
+"path_to_image2" "path_to_corresponding_label_image2",
 
-  python main.py --testing=path_to_saved_ckpt --log_dir=path_to_your_log --test_dir=path_to_CamVid_train.txt --batch_size=5 --save_image=True
-
-You can set default path and parameters in main.py line 6~18.
-note: in --testing you can specify whether to save predicted images, currently only save one image
-for manually checking, will be configured to be more flexible.
-
-# Dataset
-This Implement default to use CamVid dataset as described in the original SegNet paper,
-The dataset can be download from author's github https://github.com/alexgkendall/SegNet-Tutorial in the CamVid folder
-
-example format:
-
-"path_to_image1" "path_to_corresponded_label_image1",
-
-"path_to_image2" "path_to_corresponded_label_image2",
-
-"path_to_image3" "path_to_corresponded_label_image3",
+"path_to_image3" "path_to_corresponding_label_image3",
 
 .......
+
+## Acknowledgements
+The main code was taken from Tseng Kuan Lun Tensorflow-SegNet.
+For more details have a look at the following link:  
+(https://github.com/tkuanlun350/Tensorflow-SegNet)
